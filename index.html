@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>PulseMatrix</title>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="description" content="PulseMatrix — 3D cosmic visualization built with Three.js and GSAP." />
+    <meta
+      name="description"
+      content="PulseMatrix — 3D cosmic visualization built with Three.js and GSAP."
+    />
   </head>
 
   <body>
     <div id="app">
-      <!-- Верхняя панель -->
+      <!-- 🔹 Верхняя панель -->
       <header class="top-bar fade-in">
         <div class="logo">⚡ PulseMatrix</div>
         <nav class="menu">
@@ -18,14 +21,17 @@
         </nav>
       </header>
 
-      <!-- Оверлей поверх сцены -->
+      <!-- 🔹 Контейнер 3D сцены -->
+      <div id="scene-container"></div>
+
+      <!-- 🔹 UI-оверлей (логотип и подзаголовок) -->
       <div class="ui-overlay fade-in">
         <h1>PulseMatrix</h1>
         <p>Intergalactic Energy Flow Visualization</p>
       </div>
     </div>
 
-    <!-- Подключение сцены -->
+    <!-- 🔹 Подключение основной логики -->
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

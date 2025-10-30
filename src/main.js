@@ -2,9 +2,7 @@ import './style.css';
 import { SceneManager } from './core/SceneManager.js';
 import { gsap } from 'gsap';
 
-// --- Создание контейнера ---
-const appRoot = document.querySelector('#app');
-appRoot.innerHTML = `<div id="scene-container"></div>`;
+// --- Контейнер сцены ---
 const container = document.getElementById('scene-container');
 
 // --- Инициализация сцены ---
@@ -15,28 +13,28 @@ try {
   console.error('Ошибка инициализации SceneManager:', err);
 }
 
-// --- Передача событий мыши ---
+// --- События мыши ---
 window.addEventListener('mousemove', (event) => {
   if (sceneManager && typeof sceneManager.onMouseMove === 'function') {
     sceneManager.onMouseMove(event);
   }
 });
 
-// --- (опционально) обработка кликов по планетам ---
+// --- Клики по планетам (опционально) ---
 window.addEventListener('click', (event) => {
   if (sceneManager && typeof sceneManager.onClick === 'function') {
     sceneManager.onClick(event);
   }
 });
 
-// --- Адаптация при изменении размера окна ---
+// --- Изменение размера окна ---
 window.addEventListener('resize', () => {
   if (sceneManager && typeof sceneManager.onWindowResize === 'function') {
     sceneManager.onWindowResize();
   }
 });
 
-// --- Очистка при закрытии страницы (освобождение WebGL памяти) ---
+// --- Очистка при закрытии ---
 window.addEventListener('beforeunload', () => {
   if (sceneManager && typeof sceneManager.dispose === 'function') {
     sceneManager.dispose();
@@ -46,12 +44,16 @@ window.addEventListener('beforeunload', () => {
 // === 🚀 Обработчик кнопки LAUNCH ===
 const launchButton = document.querySelector('.btn-glow');
 const logo = document.querySelector('.logo');
+const overlayTitle = document.querySelector('.ui-overlay h1');
+const overlaySubtitle = document.querySelector('.ui-overlay p');
 
 if (launchButton) {
   launchButton.addEventListener('click', () => {
     if (!sceneManager) return;
 
-    // === 1. Визуальный отклик кнопки ===
+    console.log('🚀 PulseMatrix launch initiated');
+
+    // === 1. Анимация кнопки ===
     gsap.fromTo(
       launchButton,
       { boxShadow: '0 0 10px #00ffff' },
@@ -64,7 +66,7 @@ if (launchButton) {
       }
     );
 
-    // === 2. Пульс логотипа (реакция на запуск) ===
+    // === 2. Логотип пульсирует ===
     if (logo) {
       gsap.fromTo(
         logo,
@@ -80,7 +82,18 @@ if (launchButton) {
       );
     }
 
-    // === 3. Усиленный пульс света ===
+    // === 3. Текст под логотипом оживает ===
+    if (overlayTitle && overlaySubtitle) {
+      gsap.to([overlayTitle, overlaySubtitle], {
+        opacity: 1,
+        duration: 1.5,
+        delay: 0.2,
+        textShadow: '0 0 20px #00ffff, 0 0 60px #0099ff',
+        ease: 'sine.inOut',
+      });
+    }
+
+    // === 4. Усиленный пульс света ===
     if (sceneManager.globalPulse) {
       gsap.to(sceneManager.globalPulse, {
         intensity: 2,
@@ -91,7 +104,7 @@ if (launchButton) {
       });
     }
 
-    // === 4. Плавное ускорение вращения сцены ===
+    // === 5. Плавное ускорение вращения сцены ===
     const originalRotation = sceneManager.scene.rotation.y;
     gsap.to(sceneManager.scene.rotation, {
       y: originalRotation + Math.PI * 2,
@@ -99,7 +112,7 @@ if (launchButton) {
       ease: 'power2.out',
     });
 
-    // === 5. Всплеск яркости света ===
+    // === 6. Всплеск света ===
     if (sceneManager.light) {
       gsap.to(sceneManager.light, {
         intensity: 4,
@@ -109,23 +122,25 @@ if (launchButton) {
       });
     }
 
-    // === 6. Визуальный отклик UI (текст под логотипом) ===
-    const subtitle = document.querySelector('.ui-overlay p');
-    if (subtitle) {
-      gsap.fromTo(
-        subtitle,
-        { opacity: 0.6, textShadow: '0 0 10px #00ccff' },
-        {
-          opacity: 1,
-          textShadow: '0 0 25px #00ffff, 0 0 60px #0099ff',
-          duration: 1.5,
-          yoyo: true,
-          repeat: 1,
-          ease: 'power1.inOut',
-        }
-      );
+    // === 7. Дополнительная атмосфера — лёгкий zoom-in ===
+    if (sceneManager.camera) {
+      gsap.to(sceneManager.camera.position, {
+        z: sceneManager.camera.position.z - 5,
+        duration: 4,
+        ease: 'power1.inOut',
+        yoyo: true,
+        repeat: 1,
+      });
     }
-
-    console.log('🚀 PulseMatrix launched!');
   });
 }
+
+// === 💫 Плавный старт интерфейса ===
+window.addEventListener('load', () => {
+  const timeline = gsap.timeline();
+  timeline
+    .from('.top-bar', { y: -50, opacity: 0, duration: 1, ease: 'power2.out' })
+    .from('.ui-overlay h1', { opacity: 0, scale: 0.9, duration: 1.2 }, '-=0.4')
+    .from('.ui-overlay p', { opacity: 0, y: 20, duration: 1 }, '-=0.8')
+    .from('.btn-glow', { opacity: 0, y: -10, duration: 0.8 }, '-=0.6');
+});

@@ -29,9 +29,12 @@ export class SceneManager {
     // --- Постобработка (Bloom) ---
     this.composer = new EffectComposer(this.renderer);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      1.2, 0.4, 0.1
+      0.8, // чуть мягче
+      0.4,
+      0.2
     );
     this.composer.addPass(bloom);
 
@@ -41,8 +44,17 @@ export class SceneManager {
     this.scene.add(this.light);
     this.scene.add(new THREE.AmbientLight(0x222233, 0.6));
 
-    // --- Туман ---
-    this.scene.fog = new THREE.FogExp2(0x000010, 0.003);
+    // --- Туман (мягкий, с анимацией появления) ---
+    this.scene.fog = new THREE.FogExp2(0x000010, 0.001);
+    this.fogDensity = { value: 0.0 };
+    gsap.to(this.fogDensity, {
+      value: 0.001,
+      duration: 5,
+      ease: 'power2.out',
+      onUpdate: () => {
+        this.scene.fog.density = this.fogDensity.value;
+      }
+    });
 
     // --- Создание элементов ---
     this.createStars();
@@ -80,7 +92,7 @@ export class SceneManager {
     this.animate = this.animate.bind(this);
     requestAnimationFrame(this.animate);
 
-    // --- Resize с throttling ---
+    // --- Resize ---
     let resizeTimeout;
     window.addEventListener('resize', () => {
       clearTimeout(resizeTimeout);
@@ -100,14 +112,24 @@ export class SceneManager {
       positions.push(x, y, z);
     }
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+
     const starsMaterial = new THREE.PointsMaterial({
       color: 0xffffff,
       size: 0.5,
-      opacity: 0.65,
+      opacity: 0,
       transparent: true
     });
+
     this.stars = new THREE.Points(starsGeometry, starsMaterial);
     this.scene.add(this.stars);
+
+    // Плавное появление звёзд
+    gsap.to(this.stars.material, {
+      opacity: 0.65,
+      duration: 4,
+      ease: 'sine.inOut',
+      delay: 0.8
+    });
   }
 
   // --- Планеты ---
@@ -138,15 +160,25 @@ export class SceneManager {
         metalness: 0.3,
         roughness: 0.7,
         emissive: color.clone().multiplyScalar(0.05),
+        transparent: true,
+        opacity: 0
       });
 
       const planetGeometry = new THREE.SphereGeometry(0.9, 32, 32);
       const planet = new THREE.Mesh(planetGeometry, planetMaterial);
       planet.position.set(x, y, z);
       planet.scale.setScalar(Math.random() * 2 + 0.8);
-      planet.rotationSpeed = Math.random() * 0.005; // добавлено вращение
+      planet.rotationSpeed = Math.random() * 0.005;
       this.scene.add(planet);
       this.planets.push(planet);
+
+      // Плавное проявление каждой планеты
+      gsap.to(planet.material, {
+        opacity: 1,
+        duration: 3 + Math.random() * 2,
+        delay: Math.random() * 2,
+        ease: 'sine.inOut'
+      });
     }
   }
 
@@ -239,13 +271,13 @@ export class SceneManager {
     this.scene.add(this.trailLine);
     this.scene.add(this.travelLine);
 
-    gsap.to(material.uniforms.uOpacity, { value: 1, duration: 1.2, ease: 'sine.inOut' });
-    gsap.to(trailMaterial.uniforms.uOpacity, { value: 0.4, duration: 1.2, ease: 'sine.inOut' });
+    gsap.to(material.uniforms.uOpacity, { value: 1, duration: 1.5, ease: 'sine.inOut' });
+    gsap.to(trailMaterial.uniforms.uOpacity, { value: 0.4, duration: 1.5, ease: 'sine.inOut' });
 
     gsap.to(material.uniforms.uOpacity, {
       value: 0,
-      duration: 1.2,
-      delay: 3,
+      duration: 1.5,
+      delay: 3.2,
       ease: 'sine.inOut',
       onComplete: () => {
         this.activeIndex = this.nextIndex;
@@ -257,7 +289,7 @@ export class SceneManager {
     gsap.to(trailMaterial.uniforms.uOpacity, {
       value: 0,
       duration: 1.5,
-      delay: 2.5,
+      delay: 2.8,
       ease: 'sine.inOut'
     });
 
@@ -286,14 +318,14 @@ export class SceneManager {
 
     this.planets.forEach((planet, i) => {
       planet.material.emissiveIntensity = 0.05 + pulse * 0.1 + Math.sin(time * 1.5 + i) * 0.03;
-      planet.rotation.y += planet.rotationSpeed; // вращение планет
+      planet.rotation.y += planet.rotationSpeed;
     });
 
     this.camera.position.x += (this.targetX - this.camera.position.x) * 0.05;
     this.camera.position.y += (this.targetY - this.camera.position.y) * 0.05;
     this.camera.lookAt(0, 0, 0);
 
-    this.composer.render(); // теперь через postprocessing
+    this.composer.render();
     requestAnimationFrame(this.animate);
   }
 
