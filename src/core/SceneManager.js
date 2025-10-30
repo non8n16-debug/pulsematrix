@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 
 export class SceneManager {
   constructor(container) {
@@ -23,15 +26,72 @@ export class SceneManager {
     this.renderer.setClearColor(0x000000, 1);
     this.container.appendChild(this.renderer.domElement);
 
+    // --- Постобработка (Bloom) ---
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      1.2, 0.4, 0.1
+    );
+    this.composer.addPass(bloom);
+
     // --- Свет ---
     this.light = new THREE.PointLight(0xffffff, 2, 200);
     this.light.position.set(0, 0, 50);
     this.scene.add(this.light);
     this.scene.add(new THREE.AmbientLight(0x222233, 0.6));
 
-    // --- Звёзды ---
+    // --- Туман ---
+    this.scene.fog = new THREE.FogExp2(0x000010, 0.003);
+
+    // --- Создание элементов ---
+    this.createStars();
+    this.createPlanets();
+
+    // --- Энергетическая линия ---
+    this.activeIndex = 0;
+    this.nextIndex = 1;
+    this.travelLine = null;
+    this.trailLine = null;
+    this.wavePhase = 0;
+    this.spawnTravelLine();
+
+    // --- Пульсация ---
+    this.globalPulse = { intensity: 0 };
+    gsap.to(this.globalPulse, {
+      intensity: 1,
+      duration: 3,
+      repeat: -1,
+      yoyo: true,
+      ease: 'sine.inOut'
+    });
+
+    // --- Мышь ---
+    this.targetX = 0;
+    this.targetY = 0;
+    window.addEventListener('mousemove', (e) => {
+      const x = (e.clientX / window.innerWidth) * 2 - 1;
+      const y = (e.clientY / window.innerHeight) * 2 - 1;
+      this.targetX = x * 15;
+      this.targetY = y * 8;
+    });
+
+    this.clock = new THREE.Clock();
+    this.animate = this.animate.bind(this);
+    requestAnimationFrame(this.animate);
+
+    // --- Resize с throttling ---
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => this.onWindowResize(), 200);
+    });
+  }
+
+  // --- Звёзды ---
+  createStars() {
+    const starCount = window.innerWidth < 768 ? 1500 : 4000;
     const starsGeometry = new THREE.BufferGeometry();
-    const starCount = 4000;
     const positions = [];
     for (let i = 0; i < starCount; i++) {
       const x = THREE.MathUtils.randFloatSpread(800);
@@ -39,10 +99,7 @@ export class SceneManager {
       const z = THREE.MathUtils.randFloatSpread(800);
       positions.push(x, y, z);
     }
-    starsGeometry.setAttribute(
-      'position',
-      new THREE.Float32BufferAttribute(positions, 3)
-    );
+    starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     const starsMaterial = new THREE.PointsMaterial({
       color: 0xffffff,
       size: 0.5,
@@ -51,9 +108,11 @@ export class SceneManager {
     });
     this.stars = new THREE.Points(starsGeometry, starsMaterial);
     this.scene.add(this.stars);
+  }
 
-    // --- Реалистичные планеты ---
-    const planetCount = 65;
+  // --- Планеты ---
+  createPlanets() {
+    const planetCount = window.innerWidth < 768 ? 30 : 65;
     this.planets = [];
     const planetColors = [
       0xc2b280, 0xd8c080, 0x708090, 0x3d5b8c,
@@ -85,45 +144,13 @@ export class SceneManager {
       const planet = new THREE.Mesh(planetGeometry, planetMaterial);
       planet.position.set(x, y, z);
       planet.scale.setScalar(Math.random() * 2 + 0.8);
+      planet.rotationSpeed = Math.random() * 0.005; // добавлено вращение
       this.scene.add(planet);
       this.planets.push(planet);
     }
-
-    // --- Энергетическая линия (доплер + шлейф) ---
-    this.activeIndex = 0;
-    this.nextIndex = 1;
-    this.travelLine = null;
-    this.trailLine = null;
-    this.wavePhase = 0;
-    this.spawnTravelLine();
-
-    // --- Пульсирующее дыхание света ---
-    this.globalPulse = { intensity: 0 };
-    gsap.to(this.globalPulse, {
-      intensity: 1,
-      duration: 3,
-      repeat: -1,
-      yoyo: true,
-      ease: 'sine.inOut'
-    });
-
-    // --- Мышь ---
-    this.targetX = 0;
-    this.targetY = 0;
-    window.addEventListener('mousemove', (e) => {
-      const x = (e.clientX / window.innerWidth) * 2 - 1;
-      const y = (e.clientY / window.innerHeight) * 2 - 1;
-      this.targetX = x * 15;
-      this.targetY = y * 8;
-    });
-
-    this.clock = new THREE.Clock();
-    this.animate = this.animate.bind(this);
-    requestAnimationFrame(this.animate);
-
-    window.addEventListener('resize', this.onWindowResize.bind(this));
   }
 
+  // --- Линии путешествия ---
   spawnTravelLine() {
     if (this.travelLine) {
       this.scene.remove(this.travelLine);
@@ -148,7 +175,6 @@ export class SceneManager {
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
 
-    // === Основная линия (эффект Доплера) ===
     const material = new THREE.ShaderMaterial({
       transparent: true,
       uniforms: {
@@ -179,7 +205,6 @@ export class SceneManager {
       `,
     });
 
-    // === Шлейф линии (мягкое свечение) ===
     const trailMaterial = new THREE.ShaderMaterial({
       transparent: true,
       uniforms: {
@@ -214,7 +239,6 @@ export class SceneManager {
     this.scene.add(this.trailLine);
     this.scene.add(this.travelLine);
 
-    // --- Анимация появления / исчезновения ---
     gsap.to(material.uniforms.uOpacity, { value: 1, duration: 1.2, ease: 'sine.inOut' });
     gsap.to(trailMaterial.uniforms.uOpacity, { value: 0.4, duration: 1.2, ease: 'sine.inOut' });
 
@@ -256,20 +280,20 @@ export class SceneManager {
 
     this.updateTravelLine(delta);
 
-    // --- Глобальное пульсирующее свечение ---
     const pulse = this.globalPulse.intensity;
     this.stars.material.opacity = 0.55 + pulse * 0.35;
     this.light.intensity = 1.5 + pulse * 0.8;
 
     this.planets.forEach((planet, i) => {
       planet.material.emissiveIntensity = 0.05 + pulse * 0.1 + Math.sin(time * 1.5 + i) * 0.03;
+      planet.rotation.y += planet.rotationSpeed; // вращение планет
     });
 
     this.camera.position.x += (this.targetX - this.camera.position.x) * 0.05;
     this.camera.position.y += (this.targetY - this.camera.position.y) * 0.05;
     this.camera.lookAt(0, 0, 0);
 
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render(); // теперь через postprocessing
     requestAnimationFrame(this.animate);
   }
 
@@ -277,5 +301,6 @@ export class SceneManager {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
   }
 }
