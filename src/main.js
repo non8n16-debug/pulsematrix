@@ -1,34 +1,43 @@
 import './style.css';
 import { SceneManager } from './core/SceneManager.js';
 
-// Создаём контейнер сцены
-document.querySelector('#app').innerHTML = `
-  <div id="scene-container"></div>
-`;
-
+// --- Создание контейнера ---
+const appRoot = document.querySelector('#app');
+appRoot.innerHTML = `<div id="scene-container"></div>`;
 const container = document.getElementById('scene-container');
 
-// Инициализация менеджера сцены
-const sceneManager = new SceneManager(container);
+// --- Инициализация сцены ---
+let sceneManager = null;
+try {
+  sceneManager = new SceneManager(container);
+} catch (err) {
+  console.error('Ошибка инициализации SceneManager:', err);
+}
 
-// Обработка взаимодействий пользователя
+// --- Передача событий мыши ---
 window.addEventListener('mousemove', (event) => {
-  // перенаправляем событие в сцену (Raycaster)
-  if (sceneManager && sceneManager.onMouseMove) {
+  if (sceneManager && typeof sceneManager.onMouseMove === 'function') {
     sceneManager.onMouseMove(event);
   }
 });
 
-// (опционально) обработка кликов по планетам
+// --- (опционально) обработка кликов по планетам ---
 window.addEventListener('click', (event) => {
-  if (sceneManager && sceneManager.onClick) {
+  if (sceneManager && typeof sceneManager.onClick === 'function') {
     sceneManager.onClick(event);
   }
 });
 
-// Адаптация при изменении окна
+// --- Адаптация при изменении размера окна ---
 window.addEventListener('resize', () => {
-  if (sceneManager && sceneManager.onWindowResize) {
+  if (sceneManager && typeof sceneManager.onWindowResize === 'function') {
     sceneManager.onWindowResize();
+  }
+});
+
+// --- Очистка при закрытии страницы (освобождение WebGL памяти) ---
+window.addEventListener('beforeunload', () => {
+  if (sceneManager && typeof sceneManager.dispose === 'function') {
+    sceneManager.dispose();
   }
 });
